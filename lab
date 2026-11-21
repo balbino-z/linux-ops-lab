@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# lab: run the ops-lab troubleshooting machine and its scenarios.
+# Usage: ./lab <up|down|reset|shell|status|list|break ID|check ID>
+set -euo pipefail
+
+# Git Bash on Windows rewrites paths like /sys/fs/cgroup into C:\...; turn that off.
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IMAGE="ops-lab:local"
+NAME="opslab"
+SCENARIOS="$ROOT/scenarios"
+
+die() { echo "lab: $*" >&2; exit 1; }
+# Host paths handed to docker.exe must be Windows paths when running under Git Bash.
+hostpath() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else echo "$1"; fi; }
+is_up() { [ "$(docker inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null || true)" = "true" ]; }
+need_up() { is_up || die "the machine is not running; start it with ./lab up"; }
+
+scenario_dir() {
+  local id="$1" dir
+  dir="$(find "$SCENARIOS" -mindepth 1 -maxdepth 1 -type d -name "${id}-*" | head -n 1)"
+  [ -n "$dir" ] || die "no scenario '$id' (see ./lab list)"
+  echo "$dir"
+}
+
+wait_for_systemd() {
+  local state=""
+  for _ in $(seq 1 60); do
+    state="$(docker exec "$NAME" systemctl is-system-running 2>/dev/null || true)"
+    case "$state" in running|degraded) return 0 ;; esac
+    sleep 1
+  done
+  die "systemd did not finish booting (state: ${state:-unknown})"
+}
+
+cmd_up() {
+  if is_up; then echo "lab: already running"; return; fi
+  docker rm -f "$NAME" >/dev/null 2>&1 || true
+  echo "lab: building image..."
+  docker build -q -t "$IMAGE" "$(hostpath "$ROOT/docker")" >/dev/null
+  echo "lab: starting machine..."
+  docker run -d --name "$NAME" --hostname ops-lab \
+    --privileged --cgroupns=host \
+    -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+    --tmpfs /run --tmpfs /run/lock \
+    --tmpfs /srv/data:size=64m,mode=0755 \
+    "$IMAGE" >/dev/null
+  wait_for_systemd
+  docker exec "$NAME" bash -c 'mkdir -p /srv/data/uploads /srv/data/logs && chown -R www-data:www-data /srv/data'
+  echo "lab: ready. Open a shell with ./lab shell"
+}
+
+cmd_down() { docker rm -f "$NAME" >/dev/null 2>&1 || true; echo "lab: machine removed"; }
+
+cmd_reset() { cmd_down; cmd_up; }
+
+cmd_shell() {
+  need_up
+  local tty=(docker)
+  # mintty (Git Bash) needs winpty for an interactive TTY.
+  if [ -n "${MSYSTEM:-}" ] && command -v winpty >/dev/null 2>&1; then tty=(winpty docker); fi
+  "${tty[@]}" exec -it -u ops -w /home/ops "$NAME" bash -l
+}
+
+cmd_status() {
+  if is_up; then
+    echo "machine: running ($(docker exec "$NAME" systemctl is-system-running 2>/dev/null || true))"
+  else
+    echo "machine: stopped"
+  fi
+}
+
+cmd_list() {
+  local dir id title
+  for dir in "$SCENARIOS"/*/; do
+    dir="${dir%/}"
+    id="$(basename "$dir")"
+    title="$(head -n 1 "$dir/README.md" | sed 's/^# *//')"
+    printf '  %-28s %s\n' "$id" "$title"
+  done
+}
+
+copy_scenario() {
+  local dir="$1" id
+  id="$(basename "$dir")"
+  docker exec "$NAME" mkdir -p /root/.lab
+  docker exec "$NAME" rm -rf "/root/.lab/$id"
+  docker cp "$(hostpath "$dir")" "$NAME:/root/.lab/$id" >/dev/null
+  echo "/root/.lab/$id"
+}
+
+cmd_break() {
+  [ $# -eq 1 ] || die "usage: ./lab break <ID>"
+  need_up
+  local dir path
+  dir="$(scenario_dir "$1")"
+  path="$(copy_scenario "$dir")"
+  docker exec "$NAME" bash "$path/break.sh"
+  echo "lab: scenario $(basename "$dir") is live. Read its README, then ./lab shell"
+}
+
+cmd_check() {
+  [ $# -eq 1 ] || die "usage: ./lab check <ID>"
+  need_up
+  local dir path
+  dir="$(scenario_dir "$1")"
+  path="$(copy_scenario "$dir")"
+  if docker exec "$NAME" bash "$path/check.sh"; then
+    echo "PASS $(basename "$dir")"
+  else
+    echo "FAIL $(basename "$dir")"
+    return 1
+  fi
+}
+
+case "${1:-}" in
+  up) cmd_up ;;
+  down) cmd_down ;;
+  reset) cmd_reset ;;
+  shell) cmd_shell ;;
+  status) cmd_status ;;
+  list) cmd_list ;;
+  break) shift; cmd_break "$@" ;;
+  check) shift; cmd_check "$@" ;;
+  *) sed -n '2,3p' "${BASH_SOURCE[0]}" | sed 's/^# //'; exit 1 ;;
+esac
