@@ -1,0 +1,4 @@
+# Scripts run inside Linux: they must keep LF line endings even on Windows checkouts.
+* text=auto eol=lf
+*.png binary
+*.gif binary
