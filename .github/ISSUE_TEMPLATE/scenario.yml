@@ -1,0 +1,20 @@
+name: New scenario
+description: Propose a troubleshooting scenario
+labels: [scenario]
+body:
+  - type: textarea
+    id: ticket
+    attributes:
+      label: The ticket
+      description: What the user or the alert reports (no cause, no fix).
+    validations:
+      required: true
+  - type: textarea
+    id: skills
+    attributes:
+      label: Skills it exercises
+      placeholder: df, du, lsof, systemctl…
+  - type: textarea
+    id: check
+    attributes:
+      label: How check.sh proves it is fixed
