@@ -60,7 +60,8 @@ cmd_shell() {
   local tty=(docker)
   # mintty (Git Bash) needs winpty for an interactive TTY.
   if [ -n "${MSYSTEM:-}" ] && command -v winpty >/dev/null 2>&1; then tty=(winpty docker); fi
-  "${tty[@]}" exec -it -u ops -w /home/ops "$NAME" bash -l
+  # No path arguments here: winpty rewrites them into Windows paths. cd inside the machine instead.
+  "${tty[@]}" exec -it -u ops "$NAME" bash -lc 'cd && exec bash -l'
 }
 
 cmd_status() {
