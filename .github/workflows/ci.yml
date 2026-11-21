@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint every script
+        run: shellcheck lab tests/*.sh scenarios/*/*.sh
+
+  harness:
+    name: Scenario harness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: shellcheck
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clean machines pass, broken machines fail
+        run: ./tests/harness.sh
