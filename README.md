@@ -30,7 +30,7 @@ cd linux-ops-lab
 ## Scenarios
 | # | Ticket | Skills | Runbook |
 |---|---|---|---|
-| 01 | Uploads fail with "No space left on device" | `df`, `du`, `lsof`, `systemctl`, `journalctl` | in progress |
+| 01 | Uploads fail with "No space left on device" | `df`, `du`, `lsof`, `systemctl` | [runbook](scenarios/01-disk-full/RUNBOOK.md) |
 
 More are on the way: service won't start, port in use, runaway CPU, permission denied, DNS, and a combined "the site is down".
 
@@ -55,7 +55,7 @@ flowchart LR
 
 ## How this was built
 I designed this lab and built it with Claude Code as a pair programmer. Claude wrote the environment and the scenario harness;
-**I solve every scenario and write every runbook myself** — that rule is enforced in [CLAUDE.md](CLAUDE.md).
+**I solve every scenario and draft every runbook myself**; Claude then reviews the structure and the English (I'm improving my written English). The no-spoiler rule is enforced in [CLAUDE.md](CLAUDE.md).
 
 ## License
 [MIT](LICENSE)

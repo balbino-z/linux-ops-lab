@@ -14,7 +14,7 @@ Reproducible Linux troubleshooting scenarios on a disposable Ubuntu 24.04 machin
 Each scenario has a symptom README, `break.sh`, `check.sh` and a `RUNBOOK.md` that **I** write after solving.
 
 ## Hard rules for this repository
-- NEVER reveal the cause or the fix of a scenario, and NEVER write or edit a `RUNBOOK.md`, unless I explicitly ask after solving it.
+- NEVER reveal the cause or the fix of a scenario, and NEVER write a `RUNBOOK.md` before I draft it. After I solve and draft, you may fix structure and English when I ask.
   When I'm stuck, give one hint at a time, from general to specific.
 - `check.sh` tests outcomes (it works and keeps working), never one specific fix.
 - Scenarios only touch the lab container. Disk scenarios use the 64 MB `/srv/data` volume.
